@@ -1,0 +1,66 @@
+{
+  "subjects": [
+    {
+      "id": "sample-sub-react",
+      "subjectName": "React & Modern Web Development"
+    },
+    {
+      "id": "sample-sub-os",
+      "subjectName": "Operating Systems Principles"
+    }
+  ],
+  "documents": [
+    {
+      "subjectId": "sample-sub-react",
+      "fileName": "React_Core_Principles.pdf",
+      "content": "React is a JavaScript library for building user interfaces, developed by Meta. It allows developers to create SPAs using reusable components and the Virtual DOM. React Hooks such as useState and useEffect manage state and lifecycle effects effortlessly.",
+      "totalPages": 1
+    },
+    {
+      "subjectId": "sample-sub-os",
+      "fileName": "OS_Concepts.pdf",
+      "content": "An Operating System acts as an intermediary between user and hardware. Key concepts include Processes, Threads, CPU Scheduling (FCFS, SJF, Round Robin), and Deadlocks (Coffman conditions: Mutual Exclusion, Hold & Wait, No Preemption, Circular Wait).",
+      "totalPages": 1
+    }
+  ],
+  "flashcards": [
+    {
+      "subjectId": "sample-sub-react",
+      "question": "What is the primary function of the Virtual DOM?",
+      "answer": "It minimizes real DOM manipulation by diffing state changes in memory."
+    },
+    {
+      "subjectId": "sample-sub-react",
+      "question": "When does useEffect run if given an empty dependency array []?",
+      "answer": "It runs once when the component mounts."
+    },
+    {
+      "subjectId": "sample-sub-os",
+      "question": "What are the 4 Coffman conditions for a Deadlock?",
+      "answer": "Mutual Exclusion, Hold and Wait, No Preemption, and Circular Wait."
+    }
+  ],
+  "quizzes": [
+    {
+      "subjectId": "sample-sub-react",
+      "title": "React Fundamentals Quiz",
+      "difficulty": "medium",
+      "questions": [
+        {
+          "question": "Which hook is used to cache computed values?",
+          "options": ["useCallback", "useMemo", "useState", "useRef"],
+          "correctAnswer": "useMemo",
+          "explanation": "useMemo caches the result of a calculation between re-renders.",
+          "type": "mcq"
+        },
+        {
+          "question": "React functional components can store state using useState.",
+          "options": ["True", "False"],
+          "correctAnswer": "True",
+          "explanation": "useState is the primary hook for functional component state.",
+          "type": "tf"
+        }
+      ]
+    }
+  ]
+}

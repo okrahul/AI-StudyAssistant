@@ -1,0 +1,70 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account profile",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "email", "name"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "Study subject category",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "subjectName": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "subjectName"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "Uploaded PDF or pasted study document",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "totalPages": { "type": "number" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "subjectId", "fileName", "content"]
+    },
+    "Flashcard": {
+      "title": "Flashcard",
+      "description": "Study flashcard",
+      "properties": {
+        "id": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "question": { "type": "string" },
+        "answer": { "type": "string" },
+        "learned": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["subjectId", "question", "answer"]
+    },
+    "Quiz": {
+      "title": "Quiz",
+      "description": "Study Quiz",
+      "properties": {
+        "id": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "title": { "type": "string" },
+        "totalQuestions": { "type": "number" },
+        "completed": { "type": "boolean" },
+        "score": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["subjectId", "title"]
+    }
+  }
+}

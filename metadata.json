@@ -1,0 +1,6 @@
+{
+  "name": "AI Study Assistant",
+  "description": "An AI-powered Study Assistant to upload PDFs, ask questions, generate summaries, quizzes, and flashcards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
