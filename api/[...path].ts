@@ -1,5 +1,6 @@
-// Vercel Serverless Function entry point
-// Imports the compiled CommonJS server bundle created during 'npm run build'
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 const serverModule = require("../dist/server.cjs");
 const app = serverModule.default || serverModule.app || serverModule;
 
