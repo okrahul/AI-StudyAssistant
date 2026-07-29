@@ -16,18 +16,16 @@ import {
 import importedConfig from "../firebase-applet-config.json";
 
 const firebaseConfig = {
-  projectId: importedConfig?.projectId || "gen-lang-client-0293938171",
-  appId: importedConfig?.appId || "1:202490401321:web:6b07a6f29612e847eac238",
-  apiKey: importedConfig?.apiKey || "AIzaSyCfDfw9a-nMIhWHqiWwJf0KU-t2XSlYC-o",
+  projectId: importedConfig?.projectId || "aistudyassistant-c1926",
+  appId: importedConfig?.appId || "1:224295091251:web:aa4e8b6a0fd5cac1c6b746",
+  apiKey: importedConfig?.apiKey || "AIzaSyBVh6urcnr5MRFCvcOIi6A-gvT7l-LMYmA",
   authDomain:
-    importedConfig?.authDomain || "gen-lang-client-0293938171.firebaseapp.com",
+    importedConfig?.authDomain || "aistudyassistant-c1926.firebaseapp.com",
   storageBucket:
     importedConfig?.storageBucket ||
-    "gen-lang-client-0293938171.firebasestorage.app",
-  messagingSenderId: importedConfig?.messagingSenderId || "202490401321",
-  firestoreDatabaseId:
-    importedConfig?.firestoreDatabaseId ||
-    "ai-studio-aistudyassistant-ab39b0f1-2c34-4452-884c-df4012b20083",
+    "aistudyassistant-c1926.firebasestorage.app",
+  messagingSenderId: importedConfig?.messagingSenderId || "224295091251",
+  firestoreDatabaseId: importedConfig?.firestoreDatabaseId || "(default)",
 };
 
 // Initialize Firebase App
@@ -39,7 +37,11 @@ export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
 // Initialize Firestore Database safely with memory cache to prevent BloomFilter hash errors
-const dbId = firebaseConfig.firestoreDatabaseId || undefined;
+const dbId =
+  firebaseConfig.firestoreDatabaseId &&
+  firebaseConfig.firestoreDatabaseId !== "(default)"
+    ? firebaseConfig.firestoreDatabaseId
+    : undefined;
 let firestoreInstance;
 try {
   firestoreInstance = dbId

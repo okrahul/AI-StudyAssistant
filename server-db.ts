@@ -12,54 +12,55 @@ import {
   query,
   where,
 } from "firebase/firestore";
-
-import { readFileSync } from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 
 let importedConfig: Record<string, any> = {};
 try {
-  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-  const raw = readFileSync(configPath, "utf-8");
-  importedConfig = JSON.parse(raw);
-} catch {
-  importedConfig = {};
+  const configPath = path.resolve(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    importedConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+  }
+} catch (e) {
+  console.warn("Could not read firebase-applet-config.json:", e);
 }
 
 const firebaseConfig = {
   projectId:
     importedConfig?.projectId ||
     process.env.FIREBASE_PROJECT_ID ||
-    "gen-lang-client-0293938171",
+    "aistudyassistant-c1926",
   appId:
     importedConfig?.appId ||
     process.env.FIREBASE_APP_ID ||
-    "1:202490401321:web:6b07a6f29612e847eac238",
+    "1:224295091251:web:aa4e8b6a0fd5cac1c6b746",
   apiKey:
     importedConfig?.apiKey ||
     process.env.FIREBASE_API_KEY ||
-    "AIzaSyCfDfw9a-nMIhWHqiWwJf0KU-t2XSlYC-o",
+    "AIzaSyBVh6urcnr5MRFCvcOIi6A-gvT7l-LMYmA",
   authDomain:
     importedConfig?.authDomain ||
     process.env.FIREBASE_AUTH_DOMAIN ||
-    "gen-lang-client-0293938171.firebaseapp.com",
+    "aistudyassistant-c1926.firebaseapp.com",
   storageBucket:
     importedConfig?.storageBucket ||
     process.env.FIREBASE_STORAGE_BUCKET ||
-    "gen-lang-client-0293938171.firebasestorage.app",
+    "aistudyassistant-c1926.firebasestorage.app",
   messagingSenderId:
     importedConfig?.messagingSenderId ||
     process.env.FIREBASE_MESSAGING_SENDER_ID ||
-    "202490401321",
+    "224295091251",
   firestoreDatabaseId:
     importedConfig?.firestoreDatabaseId ||
     process.env.FIREBASE_DATABASE_ID ||
-    "ai-studio-aistudyassistant-ab39b0f1-2c34-4452-884c-df4012b20083",
+    "(default)",
 };
 
 // Initialize Firebase App for backend
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-const dbId = firebaseConfig.firestoreDatabaseId || undefined;
+const rawDbId = firebaseConfig.firestoreDatabaseId;
+const dbId = rawDbId && rawDbId !== "(default)" ? rawDbId : undefined;
 const firestoreDb = dbId ? getFirestore(app, dbId) : getFirestore(app);
 
 // Interfaces

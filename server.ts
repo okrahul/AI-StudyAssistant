@@ -1,9 +1,7 @@
-import "dotenv/config";
 import express from "express";
 import path from "path";
 import multer from "multer";
 import { GoogleGenAI, Type } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 import { db } from "./server-db";
 
 const app = express();
@@ -168,10 +166,7 @@ app.post("/api/documents/upload", upload.single("file"), async (req, res) => {
   }
 
   try {
-    // Stub polyfills so pdfjs-dist (used internally by pdf-parse) doesn't
-    // crash when the optional native "@napi-rs/canvas" package is missing.
-    // We only need text extraction, not actual page rendering, so these
-    // no-op stub classes are sufficient to satisfy pdfjs-dist's checks.
+    // Polyfill canvas/DOM globals needed by pdfjs-dist in headless Node environments
     if (typeof (globalThis as any).DOMMatrix === "undefined") {
       (globalThis as any).DOMMatrix = class DOMMatrix {
         constructor(..._args: any[]) {}
@@ -188,20 +183,20 @@ app.post("/api/documents/upload", upload.single("file"), async (req, res) => {
       };
     }
 
-    const { PDFParse } = await import("pdf-parse");
+    const pdfParseModule = await import("pdf-parse");
+    const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 
     console.log(`Parsing PDF file: ${file.originalname} (${file.size} bytes)`);
-    const parser = new PDFParse({ data: file.buffer });
-    const data = await parser.getText();
-    await parser.destroy();
-
+    const data = await pdfParse(file.buffer);
     const textContent = data.text || "";
-    const totalPages = data.total || data.pages?.length || 1;
+    const totalPages = data.numpages || data.numpages || 1;
 
     if (!textContent.trim()) {
-      return res.status(400).json({
-        error: "Extracted PDF content was empty. Is this a scanned document?",
-      });
+      return res
+        .status(400)
+        .json({
+          error: "Extracted PDF content was empty. Is this a scanned document?",
+        });
     }
 
     const docItem = await db.createDocument(
@@ -326,9 +321,11 @@ app.post("/api/summarize", async (req, res) => {
 
   const documents = await db.getDocuments(subjectId);
   if (documents.length === 0) {
-    return res.status(400).json({
-      error: "Please upload some PDFs or paste notes first to summarize!",
-    });
+    return res
+      .status(400)
+      .json({
+        error: "Please upload some PDFs or paste notes first to summarize!",
+      });
   }
 
   const combinedText = documents
@@ -404,10 +401,12 @@ app.post("/api/flashcards/generate", async (req, res) => {
 
   const documents = await db.getDocuments(subjectId);
   if (documents.length === 0) {
-    return res.status(400).json({
-      error:
-        "Please upload some PDFs or paste notes first to generate flashcards!",
-    });
+    return res
+      .status(400)
+      .json({
+        error:
+          "Please upload some PDFs or paste notes first to generate flashcards!",
+      });
   }
 
   const combinedText = documents
@@ -496,9 +495,12 @@ app.post("/api/quizzes/generate", async (req, res) => {
 
   const documents = await db.getDocuments(subjectId);
   if (documents.length === 0) {
-    return res.status(400).json({
-      error: "Please upload some PDFs or paste notes first to generate a quiz!",
-    });
+    return res
+      .status(400)
+      .json({
+        error:
+          "Please upload some PDFs or paste notes first to generate a quiz!",
+      });
   }
 
   const combinedText = documents
@@ -615,6 +617,7 @@ app.use(
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     console.log("Configuring Vite Development Middleware...");
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
