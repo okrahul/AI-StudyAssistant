@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
-import { db } from "./server-db.ts";
+import { db } from "./server-db";
 
 const app = express();
 const PORT = 3000;
@@ -17,7 +17,10 @@ const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === "application/pdf" || file.originalname.endsWith(".pdf")) {
+    if (
+      file.mimetype === "application/pdf" ||
+      file.originalname.endsWith(".pdf")
+    ) {
       cb(null, true);
     } else {
       cb(new Error("Only PDF files are supported!"));
@@ -67,7 +70,9 @@ app.post("/api/subjects", async (req, res, next) => {
   try {
     const { userId, subjectName } = req.body;
     if (!userId || !subjectName) {
-      return res.status(400).json({ error: "userId and subjectName are required" });
+      return res
+        .status(400)
+        .json({ error: "userId and subjectName are required" });
     }
     const sub = await db.createSubject(userId, subjectName);
     res.json(sub);
@@ -107,7 +112,10 @@ app.post("/api/seed-sample-data", async (req, res, next) => {
       return res.status(400).json({ error: "userId is required" });
     }
     await db.seedSampleData(userId);
-    res.json({ success: true, message: "Sample demo data populated successfully" });
+    res.json({
+      success: true,
+      message: "Sample demo data populated successfully",
+    });
   } catch (err) {
     next(err);
   }
@@ -116,7 +124,8 @@ app.post("/api/seed-sample-data", async (req, res, next) => {
 // API: Documents (PDF / Pasted Notes)
 app.get("/api/documents", async (req, res) => {
   const subjectId = req.query.subjectId as string;
-  if (!subjectId) return res.status(400).json({ error: "subjectId is required" });
+  if (!subjectId)
+    return res.status(400).json({ error: "subjectId is required" });
   const docs = await db.getDocuments(subjectId);
   res.json(docs);
 });
@@ -127,7 +136,13 @@ app.post("/api/documents/paste", async (req, res) => {
   if (!userId || !subjectId || !fileName || !content) {
     return res.status(400).json({ error: "All fields are required" });
   }
-  const docItem = await db.createDocument(userId, subjectId, fileName, content, 1);
+  const docItem = await db.createDocument(
+    userId,
+    subjectId,
+    fileName,
+    content,
+    1,
+  );
   res.json(docItem);
 });
 
@@ -150,14 +165,26 @@ app.post("/api/documents/upload", upload.single("file"), async (req, res) => {
     const totalPages = data.numpages || 1;
 
     if (!textContent.trim()) {
-      return res.status(400).json({ error: "Extracted PDF content was empty. Is this a scanned document?" });
+      return res
+        .status(400)
+        .json({
+          error: "Extracted PDF content was empty. Is this a scanned document?",
+        });
     }
 
-    const docItem = await db.createDocument(userId, subjectId, file.originalname, textContent, totalPages);
+    const docItem = await db.createDocument(
+      userId,
+      subjectId,
+      file.originalname,
+      textContent,
+      totalPages,
+    );
     res.json(docItem);
   } catch (error: any) {
     console.error("PDF upload/parsing error:", error);
-    res.status(500).json({ error: `Failed to extract text from PDF: ${error.message}` });
+    res
+      .status(500)
+      .json({ error: `Failed to extract text from PDF: ${error.message}` });
   }
 });
 
@@ -170,7 +197,8 @@ app.delete("/api/documents/:id", async (req, res) => {
 app.get("/api/chats", async (req, res) => {
   const userId = (req.query.userId as string) || "user-1";
   const subjectId = req.query.subjectId as string;
-  if (!subjectId) return res.status(400).json({ error: "subjectId is required" });
+  if (!subjectId)
+    return res.status(400).json({ error: "subjectId is required" });
   const chats = await db.getChats(userId, subjectId);
   res.json(chats);
 });
@@ -178,7 +206,9 @@ app.get("/api/chats", async (req, res) => {
 app.post("/api/chats", async (req, res) => {
   const { userId, subjectId, title } = req.body;
   if (!userId || !subjectId || !title) {
-    return res.status(400).json({ error: "userId, subjectId, and title are required" });
+    return res
+      .status(400)
+      .json({ error: "userId, subjectId, and title are required" });
   }
   const chat = await db.createChat(userId, subjectId, title);
   res.json(chat);
@@ -200,7 +230,9 @@ app.post("/api/chats/:chatId/messages", async (req, res) => {
   const { content, subjectId, tutorMode } = req.body;
 
   if (!content || !subjectId) {
-    return res.status(400).json({ error: "content and subjectId are required" });
+    return res
+      .status(400)
+      .json({ error: "content and subjectId are required" });
   }
 
   // 1. Save user message to DB
@@ -209,7 +241,9 @@ app.post("/api/chats/:chatId/messages", async (req, res) => {
   // 2. Perform RAG / Similarity Search
   console.log(`RAG Search for subject: ${subjectId} - Query: "${content}"`);
   const relevantChunks = await db.searchChunks(subjectId, content, 5);
-  const contextBlock = relevantChunks.map(c => `[Excerpt]: ${c.text}`).join("\n\n");
+  const contextBlock = relevantChunks
+    .map((c) => `[Excerpt]: ${c.text}`)
+    .join("\n\n");
 
   // 3. Select systemic persona based on tutorMode
   const systemInstruction = tutorMode
@@ -235,7 +269,9 @@ Provide a helpful, complete educational response. If the answer is found in the 
       },
     });
 
-    const answer = result.text || "I apologize, I could not generate an answer at this moment.";
+    const answer =
+      result.text ||
+      "I apologize, I could not generate an answer at this moment.";
 
     // 4. Save AI response to DB
     const aiMsg = await db.addMessage(chatId, "model", answer);
@@ -258,18 +294,28 @@ app.post("/api/summarize", async (req, res) => {
 
   const documents = await db.getDocuments(subjectId);
   if (documents.length === 0) {
-    return res.status(400).json({ error: "Please upload some PDFs or paste notes first to summarize!" });
+    return res
+      .status(400)
+      .json({
+        error: "Please upload some PDFs or paste notes first to summarize!",
+      });
   }
 
-  const combinedText = documents.map(d => d.content).join("\n\n").slice(0, 15000);
+  const combinedText = documents
+    .map((d) => d.content)
+    .join("\n\n")
+    .slice(0, 15000);
 
   let formatInstruction = "";
   if (format === "short") {
-    formatInstruction = "Provide a high-impact, short summary under 150 words. Focus strictly on core formulas, key terms, and central definitions.";
+    formatInstruction =
+      "Provide a high-impact, short summary under 150 words. Focus strictly on core formulas, key terms, and central definitions.";
   } else if (format === "detailed") {
-    formatInstruction = "Provide a rich, detailed summary (roughly 500 words). Organise it with clear headers, outline major subsystems/principles, provide comprehensive context, and explain sub-concepts sequentially.";
+    formatInstruction =
+      "Provide a rich, detailed summary (roughly 500 words). Organise it with clear headers, outline major subsystems/principles, provide comprehensive context, and explain sub-concepts sequentially.";
   } else {
-    formatInstruction = "Create structured 'Exam Revision Notes'. Include: 1) Essential definitions, 2) Core theories with bullet points, 3) 3 potential exam questions with brief answers, 4) A memory trick or acronym to remember this topic easily.";
+    formatInstruction =
+      "Create structured 'Exam Revision Notes'. Include: 1) Essential definitions, 2) Core theories with bullet points, 3) 3 potential exam questions with brief answers, 4) A memory trick or acronym to remember this topic easily.";
   }
 
   try {
@@ -287,21 +333,25 @@ app.post("/api/summarize", async (req, res) => {
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
-        systemInstruction: "You are a professional educational summarizer, helping students prep for their exams with precise summaries.",
+        systemInstruction:
+          "You are a professional educational summarizer, helping students prep for their exams with precise summaries.",
       },
     });
 
     res.json({ summary: result.text });
   } catch (error: any) {
     console.error("Summary generation error:", error);
-    res.status(500).json({ error: `Failed to generate summary: ${error.message}` });
+    res
+      .status(500)
+      .json({ error: `Failed to generate summary: ${error.message}` });
   }
 });
 
 // API: AI Flashcard Generator
 app.get("/api/flashcards", async (req, res) => {
   const subjectId = req.query.subjectId as string;
-  if (!subjectId) return res.status(400).json({ error: "subjectId is required" });
+  if (!subjectId)
+    return res.status(400).json({ error: "subjectId is required" });
   const cards = await db.getFlashcards(subjectId);
   res.json(cards);
 });
@@ -309,7 +359,9 @@ app.get("/api/flashcards", async (req, res) => {
 app.post("/api/flashcards", async (req, res) => {
   const { subjectId, question, answer } = req.body;
   if (!subjectId || !question || !answer) {
-    return res.status(400).json({ error: "subjectId, question, and answer are required" });
+    return res
+      .status(400)
+      .json({ error: "subjectId, question, and answer are required" });
   }
   const card = await db.createFlashcard(subjectId, question, answer);
   res.json(card);
@@ -317,14 +369,23 @@ app.post("/api/flashcards", async (req, res) => {
 
 app.post("/api/flashcards/generate", async (req, res) => {
   const { subjectId } = req.body;
-  if (!subjectId) return res.status(400).json({ error: "subjectId is required" });
+  if (!subjectId)
+    return res.status(400).json({ error: "subjectId is required" });
 
   const documents = await db.getDocuments(subjectId);
   if (documents.length === 0) {
-    return res.status(400).json({ error: "Please upload some PDFs or paste notes first to generate flashcards!" });
+    return res
+      .status(400)
+      .json({
+        error:
+          "Please upload some PDFs or paste notes first to generate flashcards!",
+      });
   }
 
-  const combinedText = documents.map(d => d.content).join("\n\n").slice(0, 12000);
+  const combinedText = documents
+    .map((d) => d.content)
+    .join("\n\n")
+    .slice(0, 12000);
 
   try {
     const prompt = `Analyze the study material context below, extract key definitions and concepts, and generate 6-8 distinct educational flashcards. 
@@ -345,8 +406,14 @@ app.post("/api/flashcards/generate", async (req, res) => {
           items: {
             type: Type.OBJECT,
             properties: {
-              question: { type: Type.STRING, description: "A test question for the flashcard front" },
-              answer: { type: Type.STRING, description: "The answer for the flashcard back" },
+              question: {
+                type: Type.STRING,
+                description: "A test question for the flashcard front",
+              },
+              answer: {
+                type: Type.STRING,
+                description: "The answer for the flashcard back",
+              },
             },
             required: ["question", "answer"],
           },
@@ -359,7 +426,9 @@ app.post("/api/flashcards/generate", async (req, res) => {
     res.json(createdCards);
   } catch (error: any) {
     console.error("Flashcard generation error:", error);
-    res.status(500).json({ error: `Failed to generate flashcards: ${error.message}` });
+    res
+      .status(500)
+      .json({ error: `Failed to generate flashcards: ${error.message}` });
   }
 });
 
@@ -377,7 +446,8 @@ app.delete("/api/flashcards/:id", async (req, res) => {
 // API: AI Quiz Generator
 app.get("/api/quizzes", async (req, res) => {
   const subjectId = req.query.subjectId as string;
-  if (!subjectId) return res.status(400).json({ error: "subjectId is required" });
+  if (!subjectId)
+    return res.status(400).json({ error: "subjectId is required" });
   const quizzes = await db.getQuizzes(subjectId);
   res.json(quizzes);
 });
@@ -391,15 +461,25 @@ app.get("/api/quizzes/:id", async (req, res) => {
 app.post("/api/quizzes/generate", async (req, res) => {
   const { subjectId, difficulty, title } = req.body;
   if (!subjectId || !difficulty) {
-    return res.status(400).json({ error: "subjectId and difficulty are required" });
+    return res
+      .status(400)
+      .json({ error: "subjectId and difficulty are required" });
   }
 
   const documents = await db.getDocuments(subjectId);
   if (documents.length === 0) {
-    return res.status(400).json({ error: "Please upload some PDFs or paste notes first to generate a quiz!" });
+    return res
+      .status(400)
+      .json({
+        error:
+          "Please upload some PDFs or paste notes first to generate a quiz!",
+      });
   }
 
-  const combinedText = documents.map(d => d.content).join("\n\n").slice(0, 12000);
+  const combinedText = documents
+    .map((d) => d.content)
+    .join("\n\n")
+    .slice(0, 12000);
 
   try {
     const prompt = `Based on the study materials below, generate an interactive assessment with exactly 5 questions of "${difficulty}" difficulty level.
@@ -424,14 +504,25 @@ app.post("/api/quizzes/generate", async (req, res) => {
             type: Type.OBJECT,
             properties: {
               question: { type: Type.STRING, description: "The question text" },
-              type: { type: Type.STRING, description: "Must be 'mcq', 'tf', or 'short'" },
+              type: {
+                type: Type.STRING,
+                description: "Must be 'mcq', 'tf', or 'short'",
+              },
               options: {
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
-                description: "List of options for mcq/tf questions. Empty or null for short."
+                description:
+                  "List of options for mcq/tf questions. Empty or null for short.",
               },
-              correctAnswer: { type: Type.STRING, description: "The exact correct answer or option string" },
-              explanation: { type: Type.STRING, description: "Detailed educational rationale why this is correct" },
+              correctAnswer: {
+                type: Type.STRING,
+                description: "The exact correct answer or option string",
+              },
+              explanation: {
+                type: Type.STRING,
+                description:
+                  "Detailed educational rationale why this is correct",
+              },
             },
             required: ["question", "type", "correctAnswer", "explanation"],
           },
@@ -440,13 +531,22 @@ app.post("/api/quizzes/generate", async (req, res) => {
     });
 
     const questions = JSON.parse(result.text || "[]");
-    const quizTitle = title || `${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} Knowledge Test`;
-    const quiz = await db.createQuiz(subjectId, quizTitle, difficulty, questions);
+    const quizTitle =
+      title ||
+      `${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} Knowledge Test`;
+    const quiz = await db.createQuiz(
+      subjectId,
+      quizTitle,
+      difficulty,
+      questions,
+    );
     const fullQuiz = await db.getQuizDetails(quiz.id);
     res.json(fullQuiz);
   } catch (error: any) {
     console.error("Quiz generation error:", error);
-    res.status(500).json({ error: `Failed to generate quiz: ${error.message}` });
+    res
+      .status(500)
+      .json({ error: `Failed to generate quiz: ${error.message}` });
   }
 });
 
@@ -472,12 +572,19 @@ app.get("/api/dashboard-stats", async (req, res, next) => {
 });
 
 // Global Express Error Handler to prevent HTML error responses
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error("Unhandled API Error:", err);
-  if (!res.headersSent) {
-    res.status(500).json({ error: err?.message || "Internal Server Error" });
-  }
-});
+app.use(
+  (
+    err: any,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    console.error("Unhandled API Error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err?.message || "Internal Server Error" });
+    }
+  },
+);
 
 // Start server and handle Vite development vs production assets
 async function startServer() {
@@ -498,8 +605,15 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`AI Study Assistant Server running on http://localhost:${PORT}`);
+    console.log(
+      `AI Study Assistant Server running on http://localhost:${PORT}`,
+    );
   });
 }
 
-startServer();
+export { app };
+export default app;
+
+if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
+  startServer();
+}
