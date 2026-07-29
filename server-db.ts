@@ -12,7 +12,18 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import importedConfig from "./firebase-applet-config.json";
+
+import { readFileSync } from "fs";
+import path from "path";
+
+let importedConfig: Record<string, any> = {};
+try {
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  const raw = readFileSync(configPath, "utf-8");
+  importedConfig = JSON.parse(raw);
+} catch {
+  importedConfig = {};
+}
 
 const firebaseConfig = {
   projectId:
