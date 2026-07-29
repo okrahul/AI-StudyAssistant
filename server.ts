@@ -1,10 +1,9 @@
 import express from "express";
 import path from "path";
 import multer from "multer";
-import * as pdfParseModule from "pdf-parse";
-const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 import { GoogleGenAI, Type } from "@google/genai";
-import { db } from "./server-db.js";
+import { createServer as createViteServer } from "vite";
+import { db } from "./server-db";
 
 const app = express();
 const PORT = 3000;
@@ -168,17 +167,40 @@ app.post("/api/documents/upload", upload.single("file"), async (req, res) => {
   }
 
   try {
+    // Stub polyfills so pdfjs-dist (used internally by pdf-parse) doesn't
+    // crash when the optional native "@napi-rs/canvas" package is missing.
+    // We only need text extraction, not actual page rendering, so these
+    // no-op stub classes are sufficient to satisfy pdfjs-dist's checks.
+    if (typeof (globalThis as any).DOMMatrix === "undefined") {
+      (globalThis as any).DOMMatrix = class DOMMatrix {
+        constructor(..._args: any[]) {}
+      };
+    }
+    if (typeof (globalThis as any).ImageData === "undefined") {
+      (globalThis as any).ImageData = class ImageData {
+        constructor(..._args: any[]) {}
+      };
+    }
+    if (typeof (globalThis as any).Path2D === "undefined") {
+      (globalThis as any).Path2D = class Path2D {
+        constructor(..._args: any[]) {}
+      };
+    }
+
+    const { PDFParse } = await import("pdf-parse");
+
     console.log(`Parsing PDF file: ${file.originalname} (${file.size} bytes)`);
-    const data = await pdfParse(file.buffer);
+    const parser = new PDFParse({ data: file.buffer });
+    const data = await parser.getText();
+    await parser.destroy();
+
     const textContent = data.text || "";
-    const totalPages = data.numpages || 1;
+    const totalPages = data.total || data.pages?.length || 1;
 
     if (!textContent.trim()) {
-      return res
-        .status(400)
-        .json({
-          error: "Extracted PDF content was empty. Is this a scanned document?",
-        });
+      return res.status(400).json({
+        error: "Extracted PDF content was empty. Is this a scanned document?",
+      });
     }
 
     const docItem = await db.createDocument(
@@ -303,11 +325,9 @@ app.post("/api/summarize", async (req, res) => {
 
   const documents = await db.getDocuments(subjectId);
   if (documents.length === 0) {
-    return res
-      .status(400)
-      .json({
-        error: "Please upload some PDFs or paste notes first to summarize!",
-      });
+    return res.status(400).json({
+      error: "Please upload some PDFs or paste notes first to summarize!",
+    });
   }
 
   const combinedText = documents
@@ -383,12 +403,10 @@ app.post("/api/flashcards/generate", async (req, res) => {
 
   const documents = await db.getDocuments(subjectId);
   if (documents.length === 0) {
-    return res
-      .status(400)
-      .json({
-        error:
-          "Please upload some PDFs or paste notes first to generate flashcards!",
-      });
+    return res.status(400).json({
+      error:
+        "Please upload some PDFs or paste notes first to generate flashcards!",
+    });
   }
 
   const combinedText = documents
@@ -477,12 +495,9 @@ app.post("/api/quizzes/generate", async (req, res) => {
 
   const documents = await db.getDocuments(subjectId);
   if (documents.length === 0) {
-    return res
-      .status(400)
-      .json({
-        error:
-          "Please upload some PDFs or paste notes first to generate a quiz!",
-      });
+    return res.status(400).json({
+      error: "Please upload some PDFs or paste notes first to generate a quiz!",
+    });
   }
 
   const combinedText = documents
@@ -599,7 +614,6 @@ app.use(
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     console.log("Configuring Vite Development Middleware...");
-    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -624,13 +638,6 @@ async function startServer() {
 export { app };
 export default app;
 
-// Detect if running directly as the main script (e.g. `npm run dev`, `npx tsx server.ts`, or `npx vercel dev`)
-const isMainScript =
-  Boolean(process.argv[1]) &&
-  (process.argv[1].endsWith("server.ts") ||
-    process.argv[1].endsWith("server.js") ||
-    process.argv[1].endsWith("server"));
-
-if (isMainScript || !process.env.VERCEL) {
+if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
   startServer();
 }
