@@ -1,8 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import {
   getFirestore,
-  initializeFirestore,
-  memoryLocalCache,
   collection,
   doc,
   getDoc,
@@ -14,41 +12,35 @@ import {
   query,
   where,
 } from "firebase/firestore";
-
-let rawConfig: any = {};
-try {
-  rawConfig = require("./firebase-applet-config.json");
-} catch (e) {
-  rawConfig = {};
-}
+import importedConfig from "./firebase-applet-config.json";
 
 const firebaseConfig = {
   projectId:
-    rawConfig.projectId ||
+    importedConfig?.projectId ||
     process.env.FIREBASE_PROJECT_ID ||
     "gen-lang-client-0293938171",
   appId:
-    rawConfig.appId ||
+    importedConfig?.appId ||
     process.env.FIREBASE_APP_ID ||
     "1:202490401321:web:6b07a6f29612e847eac238",
   apiKey:
-    rawConfig.apiKey ||
+    importedConfig?.apiKey ||
     process.env.FIREBASE_API_KEY ||
     "AIzaSyCfDfw9a-nMIhWHqiWwJf0KU-t2XSlYC-o",
   authDomain:
-    rawConfig.authDomain ||
+    importedConfig?.authDomain ||
     process.env.FIREBASE_AUTH_DOMAIN ||
     "gen-lang-client-0293938171.firebaseapp.com",
   storageBucket:
-    rawConfig.storageBucket ||
+    importedConfig?.storageBucket ||
     process.env.FIREBASE_STORAGE_BUCKET ||
     "gen-lang-client-0293938171.firebasestorage.app",
   messagingSenderId:
-    rawConfig.messagingSenderId ||
+    importedConfig?.messagingSenderId ||
     process.env.FIREBASE_MESSAGING_SENDER_ID ||
     "202490401321",
   firestoreDatabaseId:
-    rawConfig.firestoreDatabaseId ||
+    importedConfig?.firestoreDatabaseId ||
     process.env.FIREBASE_DATABASE_ID ||
     "ai-studio-aistudyassistant-ab39b0f1-2c34-4452-884c-df4012b20083",
 };
@@ -57,24 +49,7 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 const dbId = firebaseConfig.firestoreDatabaseId || undefined;
-let firestoreDb: any;
-try {
-  firestoreDb = dbId
-    ? initializeFirestore(
-        app,
-        {
-          localCache: memoryLocalCache(),
-          experimentalAutoDetectLongPolling: true,
-        },
-        dbId,
-      )
-    : initializeFirestore(app, {
-        localCache: memoryLocalCache(),
-        experimentalAutoDetectLongPolling: true,
-      });
-} catch {
-  firestoreDb = dbId ? getFirestore(app, dbId) : getFirestore(app);
-}
+const firestoreDb = dbId ? getFirestore(app, dbId) : getFirestore(app);
 
 // Interfaces
 export interface User {
