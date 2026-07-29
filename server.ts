@@ -4,7 +4,7 @@ import multer from "multer";
 import * as pdfParseModule from "pdf-parse";
 const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 import { GoogleGenAI, Type } from "@google/genai";
-import { db } from "./server-db";
+import { db } from "./server-db.js";
 
 const app = express();
 const PORT = 3000;
@@ -624,6 +624,13 @@ async function startServer() {
 export { app };
 export default app;
 
-if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
+// Detect if running directly as the main script (e.g. `npm run dev`, `npx tsx server.ts`, or `npx vercel dev`)
+const isMainScript =
+  Boolean(process.argv[1]) &&
+  (process.argv[1].endsWith("server.ts") ||
+    process.argv[1].endsWith("server.js") ||
+    process.argv[1].endsWith("server"));
+
+if (isMainScript || !process.env.VERCEL) {
   startServer();
 }
