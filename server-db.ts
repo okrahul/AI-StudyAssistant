@@ -1,6 +1,8 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import {
   getFirestore,
+  initializeFirestore,
+  memoryLocalCache,
   collection,
   doc,
   getDoc,
@@ -10,15 +12,69 @@ import {
   deleteDoc,
   updateDoc,
   query,
-  where
+  where,
 } from "firebase/firestore";
-import firebaseConfig from "./firebase-applet-config.json";
+
+let rawConfig: any = {};
+try {
+  rawConfig = require("./firebase-applet-config.json");
+} catch (e) {
+  rawConfig = {};
+}
+
+const firebaseConfig = {
+  projectId:
+    rawConfig.projectId ||
+    process.env.FIREBASE_PROJECT_ID ||
+    "gen-lang-client-0293938171",
+  appId:
+    rawConfig.appId ||
+    process.env.FIREBASE_APP_ID ||
+    "1:202490401321:web:6b07a6f29612e847eac238",
+  apiKey:
+    rawConfig.apiKey ||
+    process.env.FIREBASE_API_KEY ||
+    "AIzaSyCfDfw9a-nMIhWHqiWwJf0KU-t2XSlYC-o",
+  authDomain:
+    rawConfig.authDomain ||
+    process.env.FIREBASE_AUTH_DOMAIN ||
+    "gen-lang-client-0293938171.firebaseapp.com",
+  storageBucket:
+    rawConfig.storageBucket ||
+    process.env.FIREBASE_STORAGE_BUCKET ||
+    "gen-lang-client-0293938171.firebasestorage.app",
+  messagingSenderId:
+    rawConfig.messagingSenderId ||
+    process.env.FIREBASE_MESSAGING_SENDER_ID ||
+    "202490401321",
+  firestoreDatabaseId:
+    rawConfig.firestoreDatabaseId ||
+    process.env.FIREBASE_DATABASE_ID ||
+    "ai-studio-aistudyassistant-ab39b0f1-2c34-4452-884c-df4012b20083",
+};
 
 // Initialize Firebase App for backend
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const firestoreDb = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+
+const dbId = firebaseConfig.firestoreDatabaseId || undefined;
+let firestoreDb: any;
+try {
+  firestoreDb = dbId
+    ? initializeFirestore(
+        app,
+        {
+          localCache: memoryLocalCache(),
+          experimentalAutoDetectLongPolling: true,
+        },
+        dbId,
+      )
+    : initializeFirestore(app, {
+        localCache: memoryLocalCache(),
+        experimentalAutoDetectLongPolling: true,
+      });
+} catch {
+  firestoreDb = dbId ? getFirestore(app, dbId) : getFirestore(app);
+}
 
 // Interfaces
 export interface User {
@@ -107,10 +163,15 @@ class FirestoreDatabaseService {
   // Users
   async getUsers(): Promise<User[]> {
     const snap = await getDocs(collection(firestoreDb, "users"));
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as User);
   }
 
-  async createUser(id: string, email: string, name: string, avatarUrl?: string): Promise<User> {
+  async createUser(
+    id: string,
+    email: string,
+    name: string,
+    avatarUrl?: string,
+  ): Promise<User> {
     const userRef = doc(firestoreDb, "users", id);
     const existingSnap = await getDoc(userRef);
     if (existingSnap.exists()) {
@@ -121,7 +182,9 @@ class FirestoreDatabaseService {
       id,
       email,
       name,
-      avatarUrl: avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name)}`,
+      avatarUrl:
+        avatarUrl ||
+        `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(name)}`,
       createdAt: new Date().toISOString(),
     };
     await setDoc(userRef, newUser);
@@ -130,9 +193,12 @@ class FirestoreDatabaseService {
 
   // Subjects
   async getSubjects(userId: string): Promise<Subject[]> {
-    const q = query(collection(firestoreDb, "subjects"), where("userId", "==", userId));
+    const q = query(
+      collection(firestoreDb, "subjects"),
+      where("userId", "==", userId),
+    );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Subject));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Subject);
   }
 
   async createSubject(userId: string, subjectName: string): Promise<Subject> {
@@ -147,7 +213,10 @@ class FirestoreDatabaseService {
     return newSub;
   }
 
-  async renameSubject(id: string, subjectName: string): Promise<Subject | null> {
+  async renameSubject(
+    id: string,
+    subjectName: string,
+  ): Promise<Subject | null> {
     const subRef = doc(firestoreDb, "subjects", id);
     const snap = await getDoc(subRef);
     if (!snap.exists()) return null;
@@ -160,27 +229,43 @@ class FirestoreDatabaseService {
     await deleteDoc(doc(firestoreDb, "subjects", id));
 
     // Cleanup related sub-collections
-    const docsSnap = await getDocs(query(collection(firestoreDb, "documents"), where("subjectId", "==", id)));
+    const docsSnap = await getDocs(
+      query(collection(firestoreDb, "documents"), where("subjectId", "==", id)),
+    );
     for (const d of docsSnap.docs) {
       await deleteDoc(d.ref);
     }
 
-    const chunksSnap = await getDocs(query(collection(firestoreDb, "documentChunks"), where("subjectId", "==", id)));
+    const chunksSnap = await getDocs(
+      query(
+        collection(firestoreDb, "documentChunks"),
+        where("subjectId", "==", id),
+      ),
+    );
     for (const c of chunksSnap.docs) {
       await deleteDoc(c.ref);
     }
 
-    const chatsSnap = await getDocs(query(collection(firestoreDb, "chats"), where("subjectId", "==", id)));
+    const chatsSnap = await getDocs(
+      query(collection(firestoreDb, "chats"), where("subjectId", "==", id)),
+    );
     for (const c of chatsSnap.docs) {
       await deleteDoc(c.ref);
     }
 
-    const cardsSnap = await getDocs(query(collection(firestoreDb, "flashcards"), where("subjectId", "==", id)));
+    const cardsSnap = await getDocs(
+      query(
+        collection(firestoreDb, "flashcards"),
+        where("subjectId", "==", id),
+      ),
+    );
     for (const fc of cardsSnap.docs) {
       await deleteDoc(fc.ref);
     }
 
-    const quizzesSnap = await getDocs(query(collection(firestoreDb, "quizzes"), where("subjectId", "==", id)));
+    const quizzesSnap = await getDocs(
+      query(collection(firestoreDb, "quizzes"), where("subjectId", "==", id)),
+    );
     for (const q of quizzesSnap.docs) {
       await deleteDoc(q.ref);
     }
@@ -188,12 +273,21 @@ class FirestoreDatabaseService {
 
   // Documents
   async getDocuments(subjectId: string): Promise<Document[]> {
-    const q = query(collection(firestoreDb, "documents"), where("subjectId", "==", subjectId));
+    const q = query(
+      collection(firestoreDb, "documents"),
+      where("subjectId", "==", subjectId),
+    );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Document));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Document);
   }
 
-  async createDocument(userId: string, subjectId: string, fileName: string, content: string, totalPages: number = 1): Promise<Document> {
+  async createDocument(
+    userId: string,
+    subjectId: string,
+    fileName: string,
+    content: string,
+    totalPages: number = 1,
+  ): Promise<Document> {
     const docRef = doc(collection(firestoreDb, "documents"));
     const newDoc: Document = {
       id: docRef.id,
@@ -212,7 +306,12 @@ class FirestoreDatabaseService {
 
   async deleteDocument(id: string): Promise<void> {
     await deleteDoc(doc(firestoreDb, "documents", id));
-    const chunksSnap = await getDocs(query(collection(firestoreDb, "documentChunks"), where("documentId", "==", id)));
+    const chunksSnap = await getDocs(
+      query(
+        collection(firestoreDb, "documentChunks"),
+        where("documentId", "==", id),
+      ),
+    );
     for (const c of chunksSnap.docs) {
       await deleteDoc(c.ref);
     }
@@ -226,7 +325,7 @@ class FirestoreDatabaseService {
     const overlap = 30;
 
     let idCounter = 1;
-    for (let i = 0; i < words.length; i += (chunkSize - overlap)) {
+    for (let i = 0; i < words.length; i += chunkSize - overlap) {
       const chunkWords = words.slice(i, i + chunkSize);
       if (chunkWords.length === 0) break;
       const chunkText = chunkWords.join(" ");
@@ -245,20 +344,33 @@ class FirestoreDatabaseService {
     }
   }
 
-  async searchChunks(subjectId: string, queryStr: string, limit: number = 5): Promise<DocumentChunk[]> {
-    const q = query(collection(firestoreDb, "documentChunks"), where("subjectId", "==", subjectId));
+  async searchChunks(
+    subjectId: string,
+    queryStr: string,
+    limit: number = 5,
+  ): Promise<DocumentChunk[]> {
+    const q = query(
+      collection(firestoreDb, "documentChunks"),
+      where("subjectId", "==", subjectId),
+    );
     const snap = await getDocs(q);
-    const chunks = snap.docs.map(d => ({ id: d.id, ...d.data() } as DocumentChunk));
+    const chunks = snap.docs.map(
+      (d) => ({ id: d.id, ...d.data() }) as DocumentChunk,
+    );
 
     if (chunks.length === 0) return [];
 
-    const queryTerms = queryStr.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(Boolean);
+    const queryTerms = queryStr
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .split(/\s+/)
+      .filter(Boolean);
     if (queryTerms.length === 0) return chunks.slice(0, limit);
 
-    const scored = chunks.map(chunk => {
+    const scored = chunks.map((chunk) => {
       const textLower = chunk.text.toLowerCase();
       let score = 0;
-      queryTerms.forEach(term => {
+      queryTerms.forEach((term) => {
         if (textLower.includes(term)) {
           score += 1.0;
           const matches = textLower.match(new RegExp(term, "g"));
@@ -269,9 +381,9 @@ class FirestoreDatabaseService {
     });
 
     return scored
-      .filter(s => s.score > 0)
+      .filter((s) => s.score > 0)
       .sort((a, b) => b.score - a.score)
-      .map(s => s.chunk)
+      .map((s) => s.chunk)
       .slice(0, limit);
   }
 
@@ -280,13 +392,17 @@ class FirestoreDatabaseService {
     const q = query(
       collection(firestoreDb, "chats"),
       where("userId", "==", userId),
-      where("subjectId", "==", subjectId)
+      where("subjectId", "==", subjectId),
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Chat));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Chat);
   }
 
-  async createChat(userId: string, subjectId: string, title: string): Promise<Chat> {
+  async createChat(
+    userId: string,
+    subjectId: string,
+    title: string,
+  ): Promise<Chat> {
     const chatRef = doc(collection(firestoreDb, "chats"));
     const newChat: Chat = {
       id: chatRef.id,
@@ -301,7 +417,9 @@ class FirestoreDatabaseService {
 
   async deleteChat(id: string): Promise<void> {
     await deleteDoc(doc(firestoreDb, "chats", id));
-    const msgSnap = await getDocs(query(collection(firestoreDb, "messages"), where("chatId", "==", id)));
+    const msgSnap = await getDocs(
+      query(collection(firestoreDb, "messages"), where("chatId", "==", id)),
+    );
     for (const m of msgSnap.docs) {
       await deleteDoc(m.ref);
     }
@@ -309,13 +427,23 @@ class FirestoreDatabaseService {
 
   // Messages
   async getMessages(chatId: string): Promise<Message[]> {
-    const q = query(collection(firestoreDb, "messages"), where("chatId", "==", chatId));
+    const q = query(
+      collection(firestoreDb, "messages"),
+      where("chatId", "==", chatId),
+    );
     const snap = await getDocs(q);
-    const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Message));
-    return msgs.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Message);
+    return msgs.sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
   }
 
-  async addMessage(chatId: string, role: "user" | "model", content: string): Promise<Message> {
+  async addMessage(
+    chatId: string,
+    role: "user" | "model",
+    content: string,
+  ): Promise<Message> {
     const msgRef = doc(collection(firestoreDb, "messages"));
     const newMsg: Message = {
       id: msgRef.id,
@@ -330,12 +458,19 @@ class FirestoreDatabaseService {
 
   // Flashcards
   async getFlashcards(subjectId: string): Promise<Flashcard[]> {
-    const q = query(collection(firestoreDb, "flashcards"), where("subjectId", "==", subjectId));
+    const q = query(
+      collection(firestoreDb, "flashcards"),
+      where("subjectId", "==", subjectId),
+    );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Flashcard));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Flashcard);
   }
 
-  async createFlashcard(subjectId: string, question: string, answer: string): Promise<Flashcard> {
+  async createFlashcard(
+    subjectId: string,
+    question: string,
+    answer: string,
+  ): Promise<Flashcard> {
     const cardRef = doc(collection(firestoreDb, "flashcards"));
     const newCard: Flashcard = {
       id: cardRef.id,
@@ -349,8 +484,16 @@ class FirestoreDatabaseService {
     return newCard;
   }
 
-  async setFlashcards(subjectId: string, cards: { question: string; answer: string }[]): Promise<Flashcard[]> {
-    const existingSnap = await getDocs(query(collection(firestoreDb, "flashcards"), where("subjectId", "==", subjectId)));
+  async setFlashcards(
+    subjectId: string,
+    cards: { question: string; answer: string }[],
+  ): Promise<Flashcard[]> {
+    const existingSnap = await getDocs(
+      query(
+        collection(firestoreDb, "flashcards"),
+        where("subjectId", "==", subjectId),
+      ),
+    );
     for (const c of existingSnap.docs) {
       await deleteDoc(c.ref);
     }
@@ -388,9 +531,12 @@ class FirestoreDatabaseService {
 
   // Quizzes
   async getQuizzes(subjectId: string): Promise<Quiz[]> {
-    const q = query(collection(firestoreDb, "quizzes"), where("subjectId", "==", subjectId));
+    const q = query(
+      collection(firestoreDb, "quizzes"),
+      where("subjectId", "==", subjectId),
+    );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as Quiz));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Quiz);
   }
 
   async getQuizDetails(id: string): Promise<Quiz | null> {
@@ -398,12 +544,24 @@ class FirestoreDatabaseService {
     if (!qSnap.exists()) return null;
     const quiz = { id: qSnap.id, ...qSnap.data() } as Quiz;
 
-    const qqSnap = await getDocs(query(collection(firestoreDb, "quizQuestions"), where("quizId", "==", id)));
-    const questions = qqSnap.docs.map(d => ({ id: d.id, ...d.data() } as QuizQuestion));
+    const qqSnap = await getDocs(
+      query(
+        collection(firestoreDb, "quizQuestions"),
+        where("quizId", "==", id),
+      ),
+    );
+    const questions = qqSnap.docs.map(
+      (d) => ({ id: d.id, ...d.data() }) as QuizQuestion,
+    );
     return { ...quiz, questions };
   }
 
-  async createQuiz(subjectId: string, title: string, difficulty: "easy" | "medium" | "hard", questions: Omit<QuizQuestion, "id" | "quizId">[]): Promise<Quiz> {
+  async createQuiz(
+    subjectId: string,
+    title: string,
+    difficulty: "easy" | "medium" | "hard",
+    questions: Omit<QuizQuestion, "id" | "quizId">[],
+  ): Promise<Quiz> {
     const quizRef = doc(collection(firestoreDb, "quizzes"));
     const quizId = quizRef.id;
 
@@ -433,14 +591,24 @@ class FirestoreDatabaseService {
     return { ...newQuiz, questions: savedQuestions };
   }
 
-  async submitQuizAnswers(quizId: string, answers: { [questionId: string]: string }): Promise<{ quiz: Quiz; score: number } | null> {
+  async submitQuizAnswers(
+    quizId: string,
+    answers: { [questionId: string]: string },
+  ): Promise<{ quiz: Quiz; score: number } | null> {
     const quizRef = doc(firestoreDb, "quizzes", quizId);
     const qSnap = await getDoc(quizRef);
     if (!qSnap.exists()) return null;
     const quiz = { id: qSnap.id, ...qSnap.data() } as Quiz;
 
-    const qqSnap = await getDocs(query(collection(firestoreDb, "quizQuestions"), where("quizId", "==", quizId)));
-    const questions = qqSnap.docs.map(d => ({ id: d.id, ...d.data() } as QuizQuestion));
+    const qqSnap = await getDocs(
+      query(
+        collection(firestoreDb, "quizQuestions"),
+        where("quizId", "==", quizId),
+      ),
+    );
+    const questions = qqSnap.docs.map(
+      (d) => ({ id: d.id, ...d.data() }) as QuizQuestion,
+    );
 
     let correctCount = 0;
     for (const q of questions) {
@@ -450,45 +618,71 @@ class FirestoreDatabaseService {
 
       if (formattedCorrect === formattedUser) {
         correctCount++;
-      } else if (q.type === "short" && formattedCorrect.includes(formattedUser) && formattedUser.length > 2) {
+      } else if (
+        q.type === "short" &&
+        formattedCorrect.includes(formattedUser) &&
+        formattedUser.length > 2
+      ) {
         correctCount++;
       }
-      await updateDoc(doc(firestoreDb, "quizQuestions", q.id), { userAnswer: uAnswer });
+      await updateDoc(doc(firestoreDb, "quizQuestions", q.id), {
+        userAnswer: uAnswer,
+      });
     }
 
-    const scorePercent = Math.round((correctCount / (questions.length || 1)) * 100);
+    const scorePercent = Math.round(
+      (correctCount / (questions.length || 1)) * 100,
+    );
     await updateDoc(quizRef, { completed: true, score: scorePercent });
 
     const updatedQuizSnap = await getDoc(quizRef);
-    return { quiz: { id: updatedQuizSnap.id, ...updatedQuizSnap.data() } as Quiz, score: scorePercent };
+    return {
+      quiz: { id: updatedQuizSnap.id, ...updatedQuizSnap.data() } as Quiz,
+      score: scorePercent,
+    };
   }
 
   // Dashboard Stats
   async getDashboardStats(userId: string) {
     const userSubjects = await this.getSubjects(userId);
-    const subjectIds = userSubjects.map(s => s.id);
+    const subjectIds = userSubjects.map((s) => s.id);
 
-    const docsSnap = await getDocs(query(collection(firestoreDb, "documents"), where("userId", "==", userId)));
+    const docsSnap = await getDocs(
+      query(
+        collection(firestoreDb, "documents"),
+        where("userId", "==", userId),
+      ),
+    );
     const totalDocuments = docsSnap.docs.length;
 
     const fcSnap = await getDocs(collection(firestoreDb, "flashcards"));
-    const allCards = fcSnap.docs.map(d => d.data() as Flashcard).filter(f => subjectIds.includes(f.subjectId));
+    const allCards = fcSnap.docs
+      .map((d) => d.data() as Flashcard)
+      .filter((f) => subjectIds.includes(f.subjectId));
     const totalFlashcards = allCards.length;
-    const learnedFlashcards = allCards.filter(f => f.learned).length;
+    const learnedFlashcards = allCards.filter((f) => f.learned).length;
 
     const qSnap = await getDocs(collection(firestoreDb, "quizzes"));
-    const allQuizzes = qSnap.docs.map(d => d.data() as Quiz).filter(q => subjectIds.includes(q.subjectId));
+    const allQuizzes = qSnap.docs
+      .map((d) => d.data() as Quiz)
+      .filter((q) => subjectIds.includes(q.subjectId));
     const totalQuizzes = allQuizzes.length;
-    const completedQuizzes = allQuizzes.filter(q => q.completed).length;
+    const completedQuizzes = allQuizzes.filter((q) => q.completed).length;
 
-    const chatsSnap = await getDocs(query(collection(firestoreDb, "chats"), where("userId", "==", userId)));
+    const chatsSnap = await getDocs(
+      query(collection(firestoreDb, "chats"), where("userId", "==", userId)),
+    );
     const totalChats = chatsSnap.docs.length;
 
-    const subjectStats = userSubjects.map(s => {
-      const sDocs = docsSnap.docs.filter(d => d.data().subjectId === s.id).length;
-      const sCards = allCards.filter(f => f.subjectId === s.id).length;
-      const sQuizzes = allQuizzes.filter(q => q.subjectId === s.id).length;
-      const sCompleted = allQuizzes.filter(q => q.subjectId === s.id && q.completed).length;
+    const subjectStats = userSubjects.map((s) => {
+      const sDocs = docsSnap.docs.filter(
+        (d) => d.data().subjectId === s.id,
+      ).length;
+      const sCards = allCards.filter((f) => f.subjectId === s.id).length;
+      const sQuizzes = allQuizzes.filter((q) => q.subjectId === s.id).length;
+      const sCompleted = allQuizzes.filter(
+        (q) => q.subjectId === s.id && q.completed,
+      ).length;
 
       return {
         id: s.id,
@@ -516,34 +710,66 @@ class FirestoreDatabaseService {
 
   // Public method to seed sample demo data for a user on-demand
   async seedSampleData(userId: string) {
-    const subReact = await this.createSubject(userId, "React & Modern Web Development");
-    const subOS = await this.createSubject(userId, "Operating Systems Principles");
+    const subReact = await this.createSubject(
+      userId,
+      "React & Modern Web Development",
+    );
+    const subOS = await this.createSubject(
+      userId,
+      "Operating Systems Principles",
+    );
 
     const docReactText = `React is a JavaScript library for building user interfaces, developed by Meta. It allows developers to create SPAs using reusable components and the Virtual DOM. React Hooks such as useState and useEffect manage state and lifecycle effects effortlessly.`;
-    await this.createDocument(userId, subReact.id, "React_Core_Principles.pdf", docReactText, 1);
+    await this.createDocument(
+      userId,
+      subReact.id,
+      "React_Core_Principles.pdf",
+      docReactText,
+      1,
+    );
 
     const docOSText = `An Operating System acts as an intermediary between user and hardware. Key concepts include Processes, Threads, CPU Scheduling (FCFS, SJF, Round Robin), and Deadlocks (Coffman conditions: Mutual Exclusion, Hold & Wait, No Preemption, Circular Wait).`;
-    await this.createDocument(userId, subOS.id, "OS_Concepts.pdf", docOSText, 1);
+    await this.createDocument(
+      userId,
+      subOS.id,
+      "OS_Concepts.pdf",
+      docOSText,
+      1,
+    );
 
-    await this.createFlashcard(subReact.id, "What is the primary function of the Virtual DOM?", "It minimizes real DOM manipulation by diffing state changes in memory.");
-    await this.createFlashcard(subReact.id, "When does useEffect run if given an empty dependency array []?", "It runs once when the component mounts.");
-    await this.createFlashcard(subOS.id, "What are the 4 Coffman conditions for a Deadlock?", "Mutual Exclusion, Hold and Wait, No Preemption, and Circular Wait.");
+    await this.createFlashcard(
+      subReact.id,
+      "What is the primary function of the Virtual DOM?",
+      "It minimizes real DOM manipulation by diffing state changes in memory.",
+    );
+    await this.createFlashcard(
+      subReact.id,
+      "When does useEffect run if given an empty dependency array []?",
+      "It runs once when the component mounts.",
+    );
+    await this.createFlashcard(
+      subOS.id,
+      "What are the 4 Coffman conditions for a Deadlock?",
+      "Mutual Exclusion, Hold and Wait, No Preemption, and Circular Wait.",
+    );
 
     await this.createQuiz(subReact.id, "React Fundamentals Quiz", "medium", [
       {
         question: "Which hook is used to cache computed values?",
         options: ["useCallback", "useMemo", "useState", "useRef"],
         correctAnswer: "useMemo",
-        explanation: "useMemo caches the result of a calculation between re-renders.",
-        type: "mcq"
+        explanation:
+          "useMemo caches the result of a calculation between re-renders.",
+        type: "mcq",
       },
       {
         question: "React functional components can store state using useState.",
         options: ["True", "False"],
         correctAnswer: "True",
-        explanation: "useState is the primary hook for functional component state.",
-        type: "tf"
-      }
+        explanation:
+          "useState is the primary hook for functional component state.",
+        type: "tf",
+      },
     ]);
   }
 }

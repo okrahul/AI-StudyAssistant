@@ -6,10 +6,29 @@ import {
   signInWithRedirect,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  User as FirebaseUser
+  User as FirebaseUser,
 } from "firebase/auth";
-import { initializeFirestore, memoryLocalCache, getFirestore } from "firebase/firestore";
-import firebaseConfig from "../firebase-applet-config.json";
+import {
+  initializeFirestore,
+  memoryLocalCache,
+  getFirestore,
+} from "firebase/firestore";
+import importedConfig from "../firebase-applet-config.json";
+
+const firebaseConfig = {
+  projectId: importedConfig?.projectId || "gen-lang-client-0293938171",
+  appId: importedConfig?.appId || "1:202490401321:web:6b07a6f29612e847eac238",
+  apiKey: importedConfig?.apiKey || "AIzaSyCfDfw9a-nMIhWHqiWwJf0KU-t2XSlYC-o",
+  authDomain:
+    importedConfig?.authDomain || "gen-lang-client-0293938171.firebaseapp.com",
+  storageBucket:
+    importedConfig?.storageBucket ||
+    "gen-lang-client-0293938171.firebasestorage.app",
+  messagingSenderId: importedConfig?.messagingSenderId || "202490401321",
+  firestoreDatabaseId:
+    importedConfig?.firestoreDatabaseId ||
+    "ai-studio-aistudyassistant-ab39b0f1-2c34-4452-884c-df4012b20083",
+};
 
 // Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
