@@ -1,11 +1,9 @@
 import express from "express";
 import path from "path";
 import multer from "multer";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+import * as pdfParseModule from "pdf-parse";
+const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 import { GoogleGenAI, Type } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 import { db } from "./server-db";
 
 const app = express();
@@ -601,6 +599,7 @@ app.use(
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     console.log("Configuring Vite Development Middleware...");
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
